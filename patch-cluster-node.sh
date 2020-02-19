@@ -1,11 +1,20 @@
 APPLY_HDFS_PATCH=${1:-0}
 HDFS_USER=${2:-hdfs}
-PATCHED_JAR_FILE_NAME=${3:-hadoop-azure}
-PATCH_VERSION=${4:-2.7.1}
+# Revise this value for each release
+TARGET_RELEASE=${3:-v0.2}
+
+which jq > /dev/null
+if [ $? -ne 0 ]; then
+
+    echo "This script requires jq to run. Please install using preferred package manager"
+    exit 1
+fi
 
 export MATCHED_JAR_FILE_NAME=hadoop-azure
-REMOTE_HOTFIX_PATH="https://raw.githubusercontent.com/jamesbak/abfs_backport/v0.2/$PATCH_VERSION/$PATCHED_JAR_FILE_NAME.jar"
-LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
+GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
+PATCHED_JAR_FILE_NAME=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0].name')
+REMOTE_HOTFIX_PATH=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0]'.browser_download_url)
+LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME"
 
 if `test -e $LOCAL_HOTFIX_PATH`; then 
 
@@ -54,7 +63,7 @@ do
 
         # Replace with hotfix JAR
         rm -f "$DST"
-        DST="$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
+        DST="$(dirname "$DST")/$PATCHED_JAR_FILE_NAME"
         echo "cp $LOCAL_HOTFIX_PATH $DST"
         cp "$LOCAL_HOTFIX_PATH" "$DST"
     fi
@@ -74,7 +83,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
         fi
 
         sudo -u $HDFS_USER hadoop fs -rm $HDST
-        HDST="$(dirname "$HDST")/$PATCHED_JAR_FILE_NAME.jar"
+        HDST="$(dirname "$HDST")/$PATCHED_JAR_FILE_NAME"
         echo "hadoop fs -put -f $LOCAL_HOTFIX_PATH $HDST"
         sudo -u $HDFS_USER hadoop fs -put -f "$LOCAL_HOTFIX_PATH" "$HDST"
     done
@@ -129,7 +138,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
                 cp "$DST" "${DST}.original"
             fi
             rm -f "$DST"
-            cp "$LOCAL_HOTFIX_PATH" "$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
+            cp "$LOCAL_HOTFIX_PATH" "$(dirname "$DST")/$PATCHED_JAR_FILE_NAME"
         done
 
         cd $ARCHIVE_DIR
