@@ -12,9 +12,9 @@ fi
 
 export MATCHED_JAR_FILE_NAME=hadoop-azure
 GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
-PATCHED_JAR_FILE_NAME=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0].name')
+PATCHED_JAR_FILE_NAME=$(basename $(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0].name') .jar)
 REMOTE_HOTFIX_PATH=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0]'.browser_download_url)
-LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME"
+LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
 
 if `test -e $LOCAL_HOTFIX_PATH`; then 
 
@@ -40,9 +40,14 @@ do
         cp "$GZ" "${GZ}.original"
     fi
 
-    mkdir "${GZ}.dir"
-    echo "tar -C ${GZ}.dir -zxf $GZ"
-    tar -C "${GZ}.dir" -zxf "$GZ"
+    ARCHIVE_DIR="${GZ}.dir"
+    if [[ -d $ARCHIVE_DIR ]]; then
+
+        rm -rf "$ARCHIVE_DIR"
+    fi
+    mkdir "$ARCHIVE_DIR"
+    echo "tar -C "$ARCHIVE_DIR" -zxf $GZ"
+    tar -C "$ARCHIVE_DIR" -zxf "$GZ"
 done
 
 echo "Updating all JAR files with the same name"
@@ -63,7 +68,7 @@ do
 
         # Replace with hotfix JAR
         rm -f "$DST"
-        DST="$(dirname "$DST")/$PATCHED_JAR_FILE_NAME"
+        DST="$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
         echo "cp $LOCAL_HOTFIX_PATH $DST"
         cp "$LOCAL_HOTFIX_PATH" "$DST"
     fi
@@ -83,7 +88,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
         fi
 
         sudo -u $HDFS_USER hadoop fs -rm $HDST
-        HDST="$(dirname "$HDST")/$PATCHED_JAR_FILE_NAME"
+        HDST="$(dirname "$HDST")/$PATCHED_JAR_FILE_NAME.jar"
         echo "hadoop fs -put -f $LOCAL_HOTFIX_PATH $HDST"
         sudo -u $HDFS_USER hadoop fs -put -f "$LOCAL_HOTFIX_PATH" "$HDST"
     done
@@ -138,7 +143,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
                 cp "$DST" "${DST}.original"
             fi
             rm -f "$DST"
-            cp "$LOCAL_HOTFIX_PATH" "$(dirname "$DST")/$PATCHED_JAR_FILE_NAME"
+            cp "$LOCAL_HOTFIX_PATH" "$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
         done
 
         cd $ARCHIVE_DIR
@@ -147,13 +152,8 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
 
         echo "hadoop fs -copyFromLocal -p -f $LOCAL_TAR_FILE $HGZ"
         sudo -u $HDFS_USER hadoop fs -copyFromLocal -p -f "$LOCAL_TAR_FILE" "$HGZ"
-        # rm -rf $ARCHIVE_DIR
-        # rm -f $LOCAL_TAR_FILE
+        rm -rf $ARCHIVE_DIR
+        rm -f $LOCAL_TAR_FILE
     done
-fi
-
-if `test -e $LOCAL_HOTFIX_PATH`; then
-
-    rm $LOCAL_HOTFIX_PATH;
 fi
 
