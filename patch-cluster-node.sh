@@ -1,7 +1,7 @@
 APPLY_HDFS_PATCH=${1:-0}
 HDFS_USER=${2:-hdfs}
 # Revise this value for each release
-TARGET_RELEASE=${3:-v0.2}
+TARGET_RELEASE=${3:-HDP-2.5.2}
 
 which jq > /dev/null
 if [ $? -ne 0 ]; then
