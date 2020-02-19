@@ -1,3 +1,4 @@
+#!/bin/bash
 APPLY_HDFS_PATCH=${1:-0}
 HDFS_USER=${2:-hdfs}
 # Revise this value for each release
