@@ -2,7 +2,7 @@
 APPLY_HDFS_PATCH=${1:-0}
 HDFS_USER=${2:-hdfs}
 # Revise this value for each release
-TARGET_RELEASE=${3:-HDP-2.6.1}
+TARGET_RELEASE=${3}
 
 which jq > /dev/null
 if [ $? -ne 0 ]; then
@@ -11,7 +11,12 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-$Id$ 
+# If the TARGET_RELEASE hasn't been explicitly specified, try to determine this from git
+if [[ "$TARGET_RELEASE" == "" ]]; then
+
+    SCRIPT_HASH=$(echo "$Id$" | cut -d ' ' -f 2)
+    echo $SCRIPT_HASH
+fi
 
 export MATCHED_JAR_FILE_NAME=hadoop-azure
 GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
