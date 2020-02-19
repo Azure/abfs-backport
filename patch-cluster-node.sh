@@ -1,9 +1,10 @@
 APPLY_HDFS_PATCH=${1:-0}
-PATCHED_JAR_FILE_NAME=${2:-hadoop-azure}
-HDFS_USER=${3:-hdfs}
+HDFS_USER=${2:-hdfs}
+PATCHED_JAR_FILE_NAME=${3:-hadoop-azure}
+PATCH_VERSION=${4:-2.7.1}
 
 export MATCHED_JAR_FILE_NAME=hadoop-azure
-REMOTE_HOTFIX_PATH="https:///$PATCHED_JAR_FILE_NAME.jar"
+REMOTE_HOTFIX_PATH="https://raw.githubusercontent.com/jamesbak/abfs_backport/v0.2/$PATCH_VERSION/$PATCHED_JAR_FILE_NAME.jar"
 LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
 
 if `test -e $LOCAL_HOTFIX_PATH`; then 
