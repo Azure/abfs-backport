@@ -11,6 +11,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+$Id$ 
+
 export MATCHED_JAR_FILE_NAME=hadoop-azure
 GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
 PATCHED_JAR_FILE_NAME=$(basename $(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0].name') .jar)
