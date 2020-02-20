@@ -14,7 +14,7 @@ fi
 # If the TARGET_RELEASE hasn't been explicitly specified, try to determine this from git
 if [[ "$TARGET_RELEASE" == "" ]]; then
 
-    SCRIPT_HASH=$(echo "$: :$" | cut -d ' ' -f 2)
+    SCRIPT_HASH=$(echo "$::$" | cut -d ' ' -f 2)
     echo $SCRIPT_HASH
 fi
 
