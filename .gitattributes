@@ -1,1 +1,1 @@
-*.sh ident
+*.sh filter=inject_commit
