@@ -16,9 +16,23 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
     # The value between the dollar-colon tokens is automatically substituted when committing to git.
     # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:283ba95fc431c10607e95c31bd34f228fde5925d:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+    SCRIPT_COMMIT=$(echo "$:4dfd66846dd248451ca73d1d2e0e004769698796:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
 
-    TAGS=$(curl "$GITHUB_API_ROOT_URI/releases" | jq -r ".[].tag_name" | xargs -I % sh -c "curl "$GITHUB_API_ROOT_URI/git/matching-refs/tags/%" | jq -r '.[0].object.sha' | xargs -I ^ echo '{\"commit\": \"^\", \"tag\": \"%\"}'")
+    # Create a map between tags & associated commits. We have to do some funky imperative logic here because a
+    # reference to a tag can return a commit or a tag (which needs to be dereferenced)
+    TAGS=$(for tag in $(curl "$GITHUB_API_ROOT_URI/releases" | jq -r ".[].tag_name")
+    do
+
+        ref=$(curl "$GITHUB_API_ROOT_URI/git/matching-refs/tags/$tag" | jq -r '.[0].object')
+        commit=$(echo $ref | jq -r '.sha')
+        # If this is a tag reference, we need to dereference to the commit object
+        if [ "tag" == $(echo $ref | jq -r '.type') ]; then
+
+            commit=$(curl $(echo $ref | jq -r '.url') | jq -r '.object.sha')
+        fi
+        echo '{"commit": "'$commit'", "tag": "'$tag'"}'
+    done)
+
     # Walk through the commits, looking for an associated tag as we walk down until we find our current commit & that is the effective tag
     CURRENT_TAG=
     for commit in $(curl $GITHUB_API_ROOT_URI/commits | jq -r '.[].sha')
