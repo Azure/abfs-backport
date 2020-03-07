@@ -1,1 +1,1 @@
-*.sh filter=inject_commit
+*.sh filter=inject_commit text eol=lf
