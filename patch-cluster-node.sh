@@ -23,15 +23,18 @@ if [[ -z "$TARGET_RELEASE" ]]; then
     CURRENT_TAG=
     for commit in $(curl $GITHUB_API_ROOT_URI/commits | jq -r '.[].sha')
     do
-        COMMIT_TAG=$(echo $TAGS | jq -r '. | select(.commit == "'$commit'") | .tag')
-        if [ -n "$COMMIT_TAG" ]; then
 
-            CURRENT_TAG=$COMMIT_TAG
-        fi
+        # The embedded commit hash is always for the previous commit, so jump out prior to the current comparison
         if [ "$SCRIPT_COMMIT" == "$commit" ]; then
 
             TARGET_RELEASE=$CURRENT_TAG
             break
+        fi
+
+        COMMIT_TAG=$(echo $TAGS | jq -r '. | select(.commit == "'$commit'") | .tag')
+        if [ -n "$COMMIT_TAG" ]; then
+
+            CURRENT_TAG=$COMMIT_TAG
         fi
     done
 fi
