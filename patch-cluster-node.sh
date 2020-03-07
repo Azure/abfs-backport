@@ -16,8 +16,9 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
     # The value between the dollar-colon tokens is automatically substituted when committing to git.
     # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:4dfd66846dd248451ca73d1d2e0e004769698796:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+    SCRIPT_COMMIT=$(echo "$:9fd2c3246bc0f6a191914e3253e2bb79ef6ddf1c:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
 
+    echo "Determining release associated with script: $SCRIPT_COMMIT"
     # Create a map between tags & associated commits. We have to do some funky imperative logic here because a
     # reference to a tag can return a commit or a tag (which needs to be dereferenced)
     TAGS=$(for tag in $(curl "$GITHUB_API_ROOT_URI/releases" | jq -r ".[].tag_name")
@@ -61,8 +62,9 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 fi
 
 export MATCHED_JAR_FILE_NAME=hadoop-azure
-PATCHED_JAR_FILE_NAME=$(basename $(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0].name') .jar)
-REMOTE_HOTFIX_PATH=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0]'.browser_download_url)
+RELEASE_INFO=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}")
+PATCHED_JAR_FILE_NAME=$(basename $(echo $RELEASE_INFO | jq -r '.assets[0].name') .jar)
+REMOTE_HOTFIX_PATH=$(echo $RELEASE_INFO | jq -r '.assets[0]'.browser_download_url)
 LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
 
 if `test -e $LOCAL_HOTFIX_PATH`; then 
