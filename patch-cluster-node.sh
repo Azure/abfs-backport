@@ -1,7 +1,6 @@
 #!/bin/bash
 APPLY_HDFS_PATCH=${1:-0}
 HDFS_USER=${2:-hdfs}
-# Revise this value for each release
 TARGET_RELEASE=${3}
 
 which jq > /dev/null
@@ -11,15 +10,38 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# If the TARGET_RELEASE hasn't been explicitly specified, try to determine this from git
-if [[ "$TARGET_RELEASE" == "" ]]; then
+GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
+# If the TARGET_RELEASE hasn't been explicitly specified, try to determine this from github
+if [[ -z "$TARGET_RELEASE" ]]; then
 
-    SCRIPT_HASH=$(echo "$:73421df0aae8d82c9801fea6d980153cfc052a42:$" | cut -d ' ' -f 2)
-    echo $SCRIPT_HASH
+    # The value between the dollar-colon tokens is automatically substituted when committing to git.
+    # Do not modify this value or the tokens
+    SCRIPT_COMMIT=$(echo "$:73421df0aae8d82c9801fea6d980153cfc052a42:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+
+    TAGS=$(curl "$GITHUB_API_ROOT_URI/releases" | jq -r ".[].tag_name" | xargs -I % sh -c "curl "$GITHUB_API_ROOT_URI/git/matching-refs/tags/%" | jq -r '.[0].object.sha' | xargs -I ^ echo '{\"commit\": \"^\", \"tag\": \"%\"}'")
+    # Walk through the commits, looking for an associated tag as we walk down until we find our current commit & that is the effective tag
+    CURRENT_TAG=
+    for commit in $(curl $GITHUB_API_ROOT_URI/commits | jq -r '.[].sha')
+    do
+        COMMIT_TAG=$(echo $TAGS | jq -r '. | select(.commit == "'$commit'") | .tag')
+        if [ -n "$COMMIT_TAG" ]; then
+
+            CURRENT_TAG=$COMMIT_TAG
+        fi
+        if [ "$SCRIPT_COMMIT" == "$commit" ]; then
+
+            TARGET_RELEASE=$CURRENT_TAG
+            break
+        fi
+    done
+fi
+if [[ -z "$TARGET_RELEASE" ]]; then
+
+    echo "Unable to determine target Hadoop release."
+    exit 2
 fi
 
 export MATCHED_JAR_FILE_NAME=hadoop-azure
-GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
 PATCHED_JAR_FILE_NAME=$(basename $(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0].name') .jar)
 REMOTE_HOTFIX_PATH=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}" | jq -r '.assets[0]'.browser_download_url)
 LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
@@ -33,7 +55,7 @@ wget $REMOTE_HOTFIX_PATH -O $LOCAL_HOTFIX_PATH
 if [ $? -ne 0 ]; then
 
     echo "ERROR: failed to download $REMOTE_HOTFIX_PATH to $LOCAL_HOTFIX_PATH"
-    exit 1
+    exit 3
 fi
 
 echo "Locating all JAR files in .tar.gz"
@@ -63,7 +85,6 @@ for DST in $(find / -name "$MATCHED_JAR_FILE_NAME*.jar" -a ! -name "*datalake*")
 do
     echo $DST
     # only update the file if it is not a symbolic link
-
     test -h "$DST"
     if [ $? -ne 0 ]; then
 
