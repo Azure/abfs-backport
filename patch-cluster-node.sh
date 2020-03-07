@@ -16,7 +16,7 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
     # The value between the dollar-colon tokens is automatically substituted when committing to git.
     # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:73421df0aae8d82c9801fea6d980153cfc052a42:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+    SCRIPT_COMMIT=$(echo "$:283ba95fc431c10607e95c31bd34f228fde5925d:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
 
     TAGS=$(curl "$GITHUB_API_ROOT_URI/releases" | jq -r ".[].tag_name" | xargs -I % sh -c "curl "$GITHUB_API_ROOT_URI/git/matching-refs/tags/%" | jq -r '.[0].object.sha' | xargs -I ^ echo '{\"commit\": \"^\", \"tag\": \"%\"}'")
     # Walk through the commits, looking for an associated tag as we walk down until we find our current commit & that is the effective tag
@@ -33,6 +33,7 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
         # Search in our tags list to see if this commit is associated with a tag - that will become our CURRENT_TAG as we walk down
         COMMIT_TAG=$(echo $TAGS | jq -r '. | select(.commit == "'$commit'") | .tag')
+        
         if [ -n "$COMMIT_TAG" ]; then
 
             CURRENT_TAG=$COMMIT_TAG
