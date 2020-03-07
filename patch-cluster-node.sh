@@ -16,7 +16,7 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
     # The value between the dollar-colon tokens is automatically substituted when committing to git.
     # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:9fd2c3246bc0f6a191914e3253e2bb79ef6ddf1c:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+    SCRIPT_COMMIT=$(echo "$:0b2cc94b41f2d440dc6d5229bdcf50e5ba8f13f8:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
 
     echo "Determining release associated with script: $SCRIPT_COMMIT"
     # Create a map between tags & associated commits. We have to do some funky imperative logic here because a
