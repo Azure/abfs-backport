@@ -31,6 +31,7 @@ if [[ -z "$TARGET_RELEASE" ]]; then
             break
         fi
 
+        # Search in our tags list to see if this commit is associated with a tag - that will become our CURRENT_TAG as we walk down
         COMMIT_TAG=$(echo $TAGS | jq -r '. | select(.commit == "'$commit'") | .tag')
         if [ -n "$COMMIT_TAG" ]; then
 
