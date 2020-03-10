@@ -1,7 +1,31 @@
 #!/bin/bash
-APPLY_HDFS_PATCH=${1:-0}
-HDFS_USER=${2:-hdfs}
-TARGET_RELEASE=${3}
+
+APPLY_HDFS_PATCH=0
+HDFS_USER=
+TARGET_RELEASE=
+DIR_PREFIX=
+
+while getopts ":a?hu:t:p:" options
+do
+    case "${options}" in
+        a)
+            APPLY_HDFS_PATCH=1
+            ;;
+        u)
+            HDFS_USER=${OPTARG}
+            ;;
+        t)
+            TARGET_RELEASE=${OPTARG}
+            ;;
+        p)
+            DIR_PREFIX=${OPTARG}
+            ;;
+        *|?|h)
+            echo "Usage: $0 [-a] [-u HDF_USER] [-t TARGET_VERSION] [-p DIRECTORY_PREFIX] [-?]"
+            exit 1
+            ;;
+    esac
+done
 
 which jq > /dev/null
 if [ $? -ne 0 ]; then
@@ -16,7 +40,7 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
     # The value between the dollar-colon tokens is automatically substituted when committing to git.
     # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:0b2cc94b41f2d440dc6d5229bdcf50e5ba8f13f8:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+    SCRIPT_COMMIT=$(echo "$:b85cb907dcc4b8b2f238dbd67313662eff643dac:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
 
     echo "Determining release associated with script: $SCRIPT_COMMIT"
     # Create a map between tags & associated commits. We have to do some funky imperative logic here because a
@@ -67,7 +91,7 @@ PATCHED_JAR_FILE_NAME=$(basename $(echo $RELEASE_INFO | jq -r '.assets[0].name')
 REMOTE_HOTFIX_PATH=$(echo $RELEASE_INFO | jq -r '.assets[0]'.browser_download_url)
 LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
 
-if `test -e $LOCAL_HOTFIX_PATH`; then 
+if [ test -e $LOCAL_HOTFIX_PATH ]; then 
 
     rm $LOCAL_HOTFIX_PATH; 
 fi

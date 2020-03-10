@@ -1,3 +1,3 @@
 [filter "inject_commit"]
-    clean = ./inject_commit.py
+    clean = python3 inject_commit.py
     smudge = cat
