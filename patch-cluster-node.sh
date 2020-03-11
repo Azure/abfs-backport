@@ -1,11 +1,17 @@
 #!/bin/bash
 
+# Script to patch legacy Hadoop with new ABFS driver (hadoop-azure.*.jar) that has been specifically backported
+# for the targeted Hadoop distro and version.
+# To fully patch a cluster, this script must be run on EVERY node to update the local filesystem. On ONE NODE ONLY
+# the -a switch must be specified to patch the HDFS contents.
+
 APPLY_HDFS_PATCH=0
 HDFS_USER=
 TARGET_RELEASE=
 DIR_PREFIX=
+HDFS_DIR_PREFIX=
 
-while getopts ":a?hu:t:p:" options
+while getopts ":a?hu:t:p:P:" options
 do
     case "${options}" in
         a)
@@ -20,8 +26,21 @@ do
         p)
             DIR_PREFIX=${OPTARG}
             ;;
+        P)
+            HDFS_DIR_PREFIX=${OPTARG}
+            ;;
         *|?|h)
-            echo "Usage: $0 [-a] [-u HDF_USER] [-t TARGET_VERSION] [-p DIRECTORY_PREFIX] [-?]"
+            echo "Usage: $0 [-a] [-u HDFS_USER] [-t TARGET_VERSION] [-p DIRECTORY_PREFIX] [-P HDFS_DIRECTORY_PREFIX] [-?]"
+            echo ""
+            echo "Where:"
+            echo "  -a              Update HDFS contents. This switch should only be specified for ONE node in a cluster patch."
+            echo "  -u HDFS_USER    Specifies the user name with superuser privileges on HDFS. Applicable only if the -a switch is specified."
+            echo "  -t TARGET_VERSION "
+            echo "                  Specifies a Release name in the associated Github repo. This release will contain the .jar file to patch."
+            echo "  -p DIRECTORY_PREFIX "
+            echo "                  Specifies a prefix that is specific to the Hadoop distro & version to search for files to patch."
+            echo "  -P HDFS_DIRECTORY_PREFIX "
+            echo "                  Specifies a prefix that is specific to the Hadoop distro & version to search on HDFS for files to patch."
             exit 1
             ;;
     esac
@@ -40,8 +59,9 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
     # The value between the dollar-colon tokens is automatically substituted when committing to git.
     # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:b85cb907dcc4b8b2f238dbd67313662eff643dac:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+    SCRIPT_COMMIT=$(echo "$:d587d4f78979ed63e0e657dc131e486699438052:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
 
+    echo ""
     echo "Determining release associated with script: $SCRIPT_COMMIT"
     # Create a map between tags & associated commits. We have to do some funky imperative logic here because a
     # reference to a tag can return a commit or a tag (which needs to be dereferenced)
@@ -78,6 +98,7 @@ if [[ -z "$TARGET_RELEASE" ]]; then
             CURRENT_TAG=$COMMIT_TAG
         fi
     done
+    echo "Using target release: $TARGET_RELEASE"
 fi
 if [[ -z "$TARGET_RELEASE" ]]; then
 
@@ -87,30 +108,58 @@ fi
 
 export MATCHED_JAR_FILE_NAME=hadoop-azure
 RELEASE_INFO=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}")
-PATCHED_JAR_FILE_NAME=$(basename $(echo $RELEASE_INFO | jq -r '.assets[0].name') .jar)
-REMOTE_HOTFIX_PATH=$(echo $RELEASE_INFO | jq -r '.assets[0]'.browser_download_url)
-LOCAL_HOTFIX_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
+JAR_ASSET=$(echo $RELEASE_INFO | jq -r '.assets[] | select(.content_type == "application/java-archive") | .')
+if [[ -z "$JAR_ASSET" ]]; then
 
-if [ test -e $LOCAL_HOTFIX_PATH ]; then 
-
-    rm $LOCAL_HOTFIX_PATH; 
+    echo "Unable to get information for .jar file associated with $TARGET_RELEASE release."
+    exit 4
 fi
-echo "Downloading $REMOTE_HOTFIX_PATH to $LOCAL_HOTFIX_PATH"
-wget $REMOTE_HOTFIX_PATH -O $LOCAL_HOTFIX_PATH
+PATCHED_JAR_FILE_NAME=$(basename $(echo $JAR_ASSET | jq -r '.name') .jar)
+REMOTE_PATCH_PATH=$(echo $JAR_ASSET | jq -r '.browser_download_url')
+LOCAL_PATCH_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
+
+# Check for a default properties file for this release. This provides sensible defaults, but can be overridden by commandline args
+PROPS_FILE_URL=$(echo $RELEASE_INFO | jq -r '.assets[] | select(.content_type == "application/json") | .browser_download_url')
+if [[ -n "$PROPS_FILE_URL" ]]; then
+
+    echo ""
+    echo "Found properties file: $PROPS_FILE_URL. Downloading & applying."
+    # We only support a whitelisted set of variables
+    ALLOWED_VARS=("HDFS_USER" "DIR_PREFIX" "HDFS_DIR_PREFIX")
+    for PROP in $(curl -L "$PROPS_FILE_URL" | jq -r '.properties | to_entries | map("\(.key)=\(.value|tostring)") | .[]')
+    do
+
+        IFS='=' read -a PROPVALUE <<< $PROP
+        # Only overwrite if the variable is in our whitelist & is unassigned
+        if [[ " ${ALLOWED_VARS[@]} " =~ " ${PROPVALUE[0]} " && -z ${!PROPVALUE[0]} ]]; then
+
+            read "${PROPVALUE[0]}" <<< "${PROPVALUE[1]}"
+        fi
+    done
+fi
+[[ "${DIR_PREFIX}" != */ ]] && DIR_PREFIX="${DIR_PREFIX}/"
+[[ "${HDFS_DIR_PREFIX}" != */ ]] && HDFS_DIR_PREFIX="${HDFS_DIR_PREFIX}/"
+
+if [ -e $LOCAL_PATCH_PATH ]; then 
+
+    rm $LOCAL_PATCH_PATH; 
+fi
+echo ""
+echo "Downloading $REMOTE_PATCH_PATH to $LOCAL_PATCH_PATH"
+wget $REMOTE_PATCH_PATH -O $LOCAL_PATCH_PATH
 if [ $? -ne 0 ]; then
 
-    echo "ERROR: failed to download $REMOTE_HOTFIX_PATH to $LOCAL_HOTFIX_PATH"
+    echo "ERROR: failed to download $REMOTE_PATCH_PATH to $LOCAL_PATCH_PATH"
     exit 3
 fi
 
-echo "Locating all JAR files in .tar.gz"
-GZs=$(find / -name "*.tar.gz" -print0 | xargs -0 zgrep "$MATCHED_JAR_FILE_NAME" | tr ":" "\n" | grep .tar.gz)
+echo ""
+echo "Locating all JAR files in $DIR_PREFIX*.tar.gz"
+GZs=$(find "$DIR_PREFIX" -name "*.tar.gz" -print0 | xargs -0 zgrep "$MATCHED_JAR_FILE_NAME" | tr ":" "\n" | grep .tar.gz)
 for GZ in $GZs
 do
 
-    test -e "${GZ}.original"
-
-    if [ $? -ne 0 ]; then
+    if [[ ! -e "${GZ}.original" ]]; then
 
         cp "$GZ" "${GZ}.original"
     fi
@@ -125,34 +174,39 @@ do
     tar -C "$ARCHIVE_DIR" -zxf "$GZ"
 done
 
-echo "Updating all JAR files with the same name"
-for DST in $(find / -name "$MATCHED_JAR_FILE_NAME*.jar" -a ! -name "*datalake*")
+echo ""
+echo "Updating all JAR files with the same name in $DIR_PREFIX$MATCHED_JAR_FILE_NAME*.jar"
+for DST in $(find "$DIR_PREFIX" -name "$MATCHED_JAR_FILE_NAME*.jar" -a ! -name "*datalake*")
 do
     echo $DST
-    # only update the file if it is not a symbolic link
-    test -h "$DST"
-    if [ $? -ne 0 ]; then
+    # Different handling for symlink or real file
+    if [[ ! -h "$DST" ]]; then
 
         # Backup original JAR if not already backed up
-        test -e "${DST}.original"
-        if [ $? -ne 0 ]; then
+        if [[ ! -e "${DST}.original" ]]; then
 
             cp "$DST" "${DST}.original"
         fi
 
-        # Replace with hotfix JAR
+        # Replace with patched JAR
         rm -f "$DST"
         DST="$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
-        echo "cp $LOCAL_HOTFIX_PATH $DST"
-        cp "$LOCAL_HOTFIX_PATH" "$DST"
+        echo "cp $LOCAL_PATCH_PATH $DST"
+        cp "$LOCAL_PATCH_PATH" "$DST"
+    else
+
+        # For symlink, assume the target will be replaced with the correctly named file. Just update the link.
+        NEW_TARGET="$(dirname $(readlink "$DST"))/$PATCHED_JAR_FILE_NAME.jar"
+        ln -sfn "$NEW_TARGET" "$DST"
     fi
 done
 
-# only update HDFS files from primary head node
+# HDFS update
 if [ $APPLY_HDFS_PATCH -gt 0 ]; then
 
-    echo "Updating all JAR files on HDFS"
-    for HDST in $(sudo -u $HDFS_USER hadoop fs -find / -name "$MATCHED_JAR_FILE_NAME*.jar" | grep -v "datalake")
+    echo ""
+    echo "Updating all JAR files on HDFS matching; $HDFS_DIR_PREFIX$MATCHED_JAR_FILE_NAME*.jar"
+    for HDST in $(sudo -u $HDFS_USER hadoop fs -find "$HDFS_DIR_PREFIX" -name "$MATCHED_JAR_FILE_NAME*.jar" | grep -v "datalake")
     do
 
         sudo -u $HDFS_USER hadoop fs -test -e "${HDST}.original"
@@ -163,11 +217,12 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
 
         sudo -u $HDFS_USER hadoop fs -rm $HDST
         HDST="$(dirname "$HDST")/$PATCHED_JAR_FILE_NAME.jar"
-        echo "hadoop fs -put -f $LOCAL_HOTFIX_PATH $HDST"
-        sudo -u $HDFS_USER hadoop fs -put -f "$LOCAL_HOTFIX_PATH" "$HDST"
+        echo "hadoop fs -put -f $LOCAL_PATCH_PATH $HDST"
+        sudo -u $HDFS_USER hadoop fs -put -f "$LOCAL_PATCH_PATH" "$HDST"
     done
 fi
 
+echo ""
 echo "Updating all .tar.gz"
 for GZ in $GZs
 do
@@ -179,10 +234,12 @@ done
 
 if [ $APPLY_HDFS_PATCH -gt 0 ]; then
 
-    echo "Updating all .tar.gz files on HDFS"
-    for HGZ in $(sudo -E -u $HDFS_USER hadoop fs -find / -name "*.tar.gz" -print0 | xargs -0 -I % sudo -E sh -c 'hadoop fs -cat % | tar -tzv | grep "$MATCHED_JAR_FILE_NAME" && echo %' | grep ".tar.gz")
+    echo ""
+    echo "Updating all .tar.gz files on HDFS matching $HDFS_DIR_PREFIX*.tar.gz"
+    for HGZ in $(sudo -E -u $HDFS_USER hadoop fs -find "$HDFS_DIR_PREFIX" -name "*.tar.gz" -print0 | xargs -0 -I % sudo -E sh -c 'hadoop fs -cat % | tar -tzv | grep "$MATCHED_JAR_FILE_NAME" && echo %' | grep ".tar.gz")
     do
 
+        echo "$HGZ"
         # Create backup
         sudo -u $HDFS_USER hadoop fs -test -e "${HGZ}.original"
         if [ $? -ne 0 ]; then
@@ -217,7 +274,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
                 cp "$DST" "${DST}.original"
             fi
             rm -f "$DST"
-            cp "$LOCAL_HOTFIX_PATH" "$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
+            cp "$LOCAL_PATCH_PATH" "$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
         done
 
         cd $ARCHIVE_DIR
@@ -230,4 +287,3 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
         rm -f $LOCAL_TAR_FILE
     done
 fi
-
