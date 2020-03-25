@@ -21,7 +21,7 @@ JAR_EXTENSION=".jar"
 #
 JAR_FIND_SUFFIX=""
 
-while getopts ":a?hu:t:p:P:" options
+while getopts ":a?hu:t:p:P:R" options
 do
     case "${options}" in
         a)
@@ -89,7 +89,7 @@ if [[ -z "$TARGET_RELEASE" ]]; then
 
     # The value between the dollar-colon tokens is automatically substituted when committing to git.
     # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:14fd608f0ac11b27048b07c6b66d6a899934f37c:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
+    SCRIPT_COMMIT=$(echo "$:de3b7991f3fbaf029698a0142e14ec03c573205b:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
 
     echo ""
     echo "Determining release associated with script: $SCRIPT_COMMIT"
@@ -303,7 +303,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
             elif [[ "$HDST_EXTENSION" == "$JAR_EXTENSION" ]]; then
 
                 # hadoop-azure*.jar -> rm
-                echo "    hadoop fs -rm $HDST
+                echo "    hadoop fs -rm $HDST"
                 sudo -u $HDFS_USER hadoop fs -rm "$HDST"
             fi
         fi
