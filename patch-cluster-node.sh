@@ -5,23 +5,33 @@
 # To fully patch a cluster, this script must be run on EVERY node to update the local filesystem. On ONE NODE ONLY
 # the -a switch must be specified to patch the HDFS contents.
 
+which jq > /dev/null
+if [ $? -ne 0 ]; then
+
+    echo "This script requires jq to run. Please install using preferred package manager"
+    exit 1
+fi
+
+
 # Parameters
 APPLY_HDFS_PATCH=0
 HDFS_USER=
-TARGET_RELEASE=
 DIR_PREFIX=
 HDFS_DIR_PREFIX=
 ROLLBACK=0
 
+
 # Constants
 export MATCHED_JAR_FILE_NAME=hadoop-azure
 GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
-BACKUP_SUFFIX=".original"
+CURR_TIME=$(date "+%Y-%m-%d-%H-%M-%S")
+BACKUP_SUFFIX=".original_${CURR_TIME}"
 JAR_EXTENSION=".jar"
 #
 JAR_FIND_SUFFIX=""
 
-while getopts ":a?hu:t:p:P:R" options
+
+while getopts ":a?hu:p:P:R:" options
 do
     case "${options}" in
         a)
@@ -29,9 +39,6 @@ do
             ;;
         u)
             HDFS_USER=${OPTARG}
-            ;;
-        t)
-            TARGET_RELEASE=${OPTARG}
             ;;
         p)
             DIR_PREFIX=${OPTARG}
@@ -41,6 +48,11 @@ do
             ;;
         R)
             ROLLBACK=1
+            if [ -z ${OPTARG} ]; then
+                echo "Exiting; Backup version parameter is required for rollback"
+                exit 4
+            fi
+            BACKUP_SUFFIX=".original_${OPTARG}"
             ;;
         *|?|h)
             echo "Usage: $0 [-a] [-u HDFS_USER] [-t TARGET_VERSION] [-p DIRECTORY_PREFIX] [-P HDFS_DIRECTORY_PREFIX] [-R] [-?]"
@@ -48,28 +60,42 @@ do
             echo "Where:"
             echo "  -a              Update HDFS contents. This switch should only be specified for ONE node in a cluster patch."
             echo "  -u HDFS_USER    Specifies the user name with superuser privileges on HDFS. Applicable only if the -a switch is specified."
-            echo "  -t TARGET_VERSION "
-            echo "                  Specifies a Release name in the associated Github repo. This release will contain the .jar file to patch."
             echo "  -p DIRECTORY_PREFIX "
             echo "                  Specifies a prefix that is specific to the Hadoop distro & version to search for files to patch."
             echo "  -P HDFS_DIRECTORY_PREFIX "
             echo "                  Specifies a prefix that is specific to the Hadoop distro & version to search on HDFS for files to patch."
             echo "  -R              Rollback installation. Restores previously backed up versions of hadoop-azure jar file. Rollback for HDFS "
-            echo "                  should follow same model as deployment."
+            echo "                  should follow same model as deployment. Specify the backup version for the rollback. Ex: Specify 2020-06-07-10-10-10 "
+            echo "                  for the backup file named hadoop-azure.*.jar.original_2020-06-07-10-10-10"
             exit 1
             ;;
     esac
 done
 
-which jq > /dev/null
-if [ $? -ne 0 ]; then
 
-    echo "This script requires jq to run. Please install using preferred package manager"
-    exit 1
-fi
+[[ "${DIR_PREFIX}" != */ ]] && DIR_PREFIX="${DIR_PREFIX}/"
+[[ "${HDFS_DIR_PREFIX}" != */ ]] && HDFS_DIR_PREFIX="${HDFS_DIR_PREFIX}/"
+
+TARGET_RELEASE="HDP-2.5.2"
+
 
 # Confirm rollback
 if [ $ROLLBACK -gt 0 ]; then
+    
+    echo "find $DIR_PREFIX -name $MATCHED_JAR_FILE_NAME*.jar$BACKUP_SUFFIX -a ! -name *datalake* | wc -l"
+    JARCOUNT=$(find $DIR_PREFIX -name $MATCHED_JAR_FILE_NAME*.jar$BACKUP_SUFFIX -a ! -name *datalake* | wc -l)
+    echo "jar files found with rollback version: $JARCOUNT"
+
+    echo "find $DIR_PREFIX -name *.tar.gz${BACKUP_SUFFIX} -a ! -name *datalake* | wc -l"
+    GZCOUNT=$(find $DIR_PREFIX -name ${GZ}${BACKUP_SUFFIX} -a ! -name *datalake* | wc -l)
+    echo "Zip files found with rollback version: $GZCOUNT"
+
+    TOT=$(($JARCOUNT+$GZCOUNT))
+    echo "Number of files found for rollback : $TOT"
+    if [[ ${TOT} -eq 0 ]]; then
+        echo "Exiting. Backup version for rollback specified is not found."
+        exit 4
+    fi
 
     echo "***************** NOTICE ****************************"
     echo "This script will rollback previously applied changes."
@@ -84,57 +110,6 @@ if [ $ROLLBACK -gt 0 ]; then
     JAR_FIND_SUFFIX="*"
 fi
 
-# If the TARGET_RELEASE hasn't been explicitly specified, try to determine this from github
-if [[ -z "$TARGET_RELEASE" ]]; then
-
-    # The value between the dollar-colon tokens is automatically substituted when committing to git.
-    # Do not modify this value or the tokens
-    SCRIPT_COMMIT=$(echo "$:de3b7991f3fbaf029698a0142e14ec03c573205b:$" | cut -d '$' -f 2 | cut -d ':' -f 2)
-
-    echo ""
-    echo "Determining release associated with script: $SCRIPT_COMMIT"
-    # Create a map between tags & associated commits. We have to do some funky imperative logic here because a
-    # reference to a tag can return a commit or a tag (which needs to be dereferenced)
-    TAGS=$(for tag in $(curl "$GITHUB_API_ROOT_URI/releases" | jq -r ".[].tag_name")
-    do
-
-        ref=$(curl "$GITHUB_API_ROOT_URI/git/matching-refs/tags/$tag" | jq -r '.[0].object')
-        commit=$(echo $ref | jq -r '.sha')
-        # If this is a tag reference, we need to dereference to the commit object
-        if [ "tag" == $(echo $ref | jq -r '.type') ]; then
-
-            commit=$(curl $(echo $ref | jq -r '.url') | jq -r '.object.sha')
-        fi
-        echo '{"commit": "'$commit'", "tag": "'$tag'"}'
-    done)
-
-    # Walk through the commits, looking for an associated tag as we walk down until we find our current commit & that is the effective tag
-    CURRENT_TAG=
-    for commit in $(curl $GITHUB_API_ROOT_URI/commits | jq -r '.[].sha')
-    do
-
-        # The embedded commit hash is always for the previous commit, so jump out prior to the current comparison
-        if [ "$SCRIPT_COMMIT" == "$commit" ]; then
-
-            TARGET_RELEASE=$CURRENT_TAG
-            break
-        fi
-
-        # Search in our tags list to see if this commit is associated with a tag - that will become our CURRENT_TAG as we walk down
-        COMMIT_TAG=$(echo $TAGS | jq -r '. | select(.commit == "'$commit'") | .tag')
-        
-        if [ -n "$COMMIT_TAG" ]; then
-
-            CURRENT_TAG=$COMMIT_TAG
-        fi
-    done
-    echo "Using target release: $TARGET_RELEASE"
-fi
-if [[ -z "$TARGET_RELEASE" ]]; then
-
-    echo "Unable to determine target Hadoop release."
-    exit 2
-fi
 
 RELEASE_INFO=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}")
 JAR_ASSET=$(echo $RELEASE_INFO | jq -r '.assets[] | select(.content_type == "application/java-archive") | .')
@@ -146,28 +121,6 @@ fi
 PATCHED_JAR_FILE_NAME=$(basename $(echo $JAR_ASSET | jq -r '.name') .jar)
 REMOTE_PATCH_PATH=$(echo $JAR_ASSET | jq -r '.browser_download_url')
 LOCAL_PATCH_PATH="/tmp/$PATCHED_JAR_FILE_NAME.new"
-
-# Check for a default properties file for this release. This provides sensible defaults, but can be overridden by commandline args
-PROPS_FILE_URL=$(echo $RELEASE_INFO | jq -r '.assets[] | select(.content_type == "application/json") | .browser_download_url')
-if [[ -n "$PROPS_FILE_URL" ]]; then
-
-    echo ""
-    echo "Found properties file: $PROPS_FILE_URL. Downloading & applying."
-    # We only support a whitelisted set of variables
-    ALLOWED_VARS=("HDFS_USER" "DIR_PREFIX" "HDFS_DIR_PREFIX")
-    for PROP in $(curl -L "$PROPS_FILE_URL" | jq -r '.properties | to_entries | map("\(.key)=\(.value|tostring)") | .[]')
-    do
-
-        IFS='=' read -a PROPVALUE <<< $PROP
-        # Only overwrite if the variable is in our whitelist & is unassigned
-        if [[ " ${ALLOWED_VARS[@]} " =~ " ${PROPVALUE[0]} " && -z ${!PROPVALUE[0]} ]]; then
-
-            read "${PROPVALUE[0]}" <<< "${PROPVALUE[1]}"
-        fi
-    done
-fi
-[[ "${DIR_PREFIX}" != */ ]] && DIR_PREFIX="${DIR_PREFIX}/"
-[[ "${HDFS_DIR_PREFIX}" != */ ]] && HDFS_DIR_PREFIX="${HDFS_DIR_PREFIX}/"
 
 if [ $ROLLBACK -eq 0 ]; then
 
@@ -184,6 +137,7 @@ if [ $ROLLBACK -eq 0 ]; then
         exit 3
     fi
 fi
+
 
 echo ""
 echo "Locating all JAR files in $DIR_PREFIX*.tar.gz"
@@ -219,6 +173,7 @@ do
     fi
 done
 
+
 echo ""
 echo "Updating all JAR files with the same name in $DIR_PREFIX$MATCHED_JAR_FILE_NAME*.jar$JAR_FIND_SUFFIX"
 for DST in $(find "$DIR_PREFIX" -name "$MATCHED_JAR_FILE_NAME*.jar$JAR_FIND_SUFFIX" -a ! -name "*datalake*")
@@ -226,25 +181,22 @@ do
     echo $DST
     if [ $ROLLBACK -eq 0 ]; then
 
-        # Backup original file (jar or symlink) if not already backed up
-        if [[ ! -e "${DST}${BACKUP_SUFFIX}" ]]; then
-
-            cp "$DST" "${DST}${BACKUP_SUFFIX}"
-        fi
         # Different handling for symlink or real file
         if [[ ! -h "$DST" ]]; then
+
+            # Backup original file (jar or symlink) if not already backed up
+            if [[ ! -e "${DST}${BACKUP_SUFFIX}" ]]; then
+
+                cp "$DST" "${DST}${BACKUP_SUFFIX}"
+            fi
 
             # Replace with patched JAR
             rm -f "$DST"
             DST="$(dirname "$DST")/$PATCHED_JAR_FILE_NAME.jar"
             echo "    cp $LOCAL_PATCH_PATH $DST"
             cp "$LOCAL_PATCH_PATH" "$DST"
-        else
-
-            # For symlink, assume the target will be replaced with the correctly named file. Just update the link.
-            NEW_TARGET="$(dirname $(readlink "$DST"))/$PATCHED_JAR_FILE_NAME.jar"
-            ln -sfn "$NEW_TARGET" "$DST"
         fi
+        
     else
 
         # Rollback changes - need to handle 2 cases; hadoop-azure*.jar.original -> hadoop-azure*.jar & hadoop-azure*.jar -> rm
@@ -266,6 +218,7 @@ do
         fi
     fi
 done
+
 
 # HDFS update
 if [ $APPLY_HDFS_PATCH -gt 0 ]; then
@@ -310,6 +263,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
     done
 fi
 
+
 if [ $ROLLBACK -eq 0 ]; then
 
     echo ""
@@ -322,6 +276,7 @@ if [ $ROLLBACK -eq 0 ]; then
         rm -rf "${GZ}.dir"
     done
 fi
+
 
 if [ $APPLY_HDFS_PATCH -gt 0 ]; then
 
@@ -392,3 +347,4 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
     done
 fi
 echo "Finished"
+
