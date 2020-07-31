@@ -19,29 +19,24 @@ Please install the same from the following link: https://stedolan.github.io/jq/d
 
 The script works with the HDP-2.5.2 release of the abfs-backport repo (https://github.com/Azure/abfs-backport/releases/tag/HDP-2.5.2). It downloads the jar bundled with the release and patches the cluster node with the same.
 
-The existing jar and tag.gz files will be backed up with a suffix .original_<version>.
+The existing jar and tag.gz files will be backed up with a suffix .original_{version}.
 
-<version> will be of the format: <yyyy>-<MM>-<dd>-<HH>-<mm>-<ss>. 
+{version} will be of the format: {yyyy}-{MM}-{dd}-{HH}-{mm}-{ss}. 
   
 ### Usage
 
-Usage: patch-cluster-node.sh [-a] [-u HDFS_USER] [-t TARGET_VERSION] [-p DIRECTORY_PREFIX] [-P HDFS_DIRECTORY_PREFIX] [-R] [-?]
+Usage: 
+
+    patch-cluster-node.sh [-a] [-u HDFS_USER] [-t TARGET_VERSION] [-p DIRECTORY_PREFIX] [-P HDFS_DIRECTORY_PREFIX] [-R] [-?]
 
 Where:
--a              
-Update HDFS contents. This switch should only be specified for ONE node in a cluster patch.
 
--u HDFS_USER    
-Specifies the user name with superuser privileges on HDFS. Applicable only if the -a switch is specified.
-The default value is hdfs.
+`-a`  Update HDFS contents. This switch should only be specified for ONE node in a cluster patch.
 
--p DIRECTORY_PREFIX 
-Specifies a prefix that is specific to the Hadoop distro & version to search for files to patch.
-The default value is /
+`-u HDFS_USER`  Specifies the user name with superuser privileges on HDFS. Applicable only if the -a switch is specified. The default value is hdfs.
 
--P HDFS_DIRECTORY_PREFIX 
-Specifies a prefix that is specific to the Hadoop distro & version to search on HDFS for files to patch.
-The default value is /
+`-p DIRECTORY_PREFIX` Specifies a prefix that is specific to the Hadoop distro & version to search for files to patch. The default value is /
 
--R
-Rollback installation. Restores previously backed up versions of hadoop-azure jar file. Rollback for HDFS should follow same model as deployment. Specify the backup version for the rollback. Ex: Specify 2020-06-07-10-10-10 for the backup file named hadoop-azure.*.jar.original_2020-06-07-10-10-10
+`-P HDFS_DIRECTORY_PREFIX`  Specifies a prefix that is specific to the Hadoop distro & version to search on HDFS for files to patch. The default value is /
+
+`-R`  Rollback installation. Restores previously backed up versions of hadoop-azure jar file. Rollback for HDFS should follow same model as deployment. Specify the backup version for the rollback. Ex: Specify 2020-06-07-10-10-10 for the backup file named hadoop-azure.*.jar.original_2020-06-07-10-10-10
