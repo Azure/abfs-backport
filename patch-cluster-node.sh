@@ -8,9 +8,9 @@
 checkstatus() {
     
      if [ $? -ne 0 ]; then
-        echo "$1 failed"
+        echo "DEBUG... $1 failed"
     else
-        echo "$1 success"
+        echo "DEBUG... $1 success"
     fi
 }
 
@@ -257,15 +257,15 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
             if [ $? -ne 0 ]; then
 
                 sudo -u $HDFS_USER hadoop fs -cp "$HDST" "${HDST}${BACKUP_SUFFIX}"
-                checkstatus "ERROR: failed to (hadoop fs -cp $HDST ${HDST}${BACKUP_SUFFIX})"
+                checkstatus "hadoop fs -cp $HDST ${HDST}${BACKUP_SUFFIX})"
             fi
 
             sudo -u $HDFS_USER hadoop fs -rm $HDST
-            checkstatus "ERROR: failed to (hadoop fs -rm $HDST)"
+            checkstatus "hadoop fs -rm $HDST)"
             HDST="$(dirname "$HDST")/$PATCHED_JAR_FILE_NAME.jar"
             echo "    hadoop fs -put -f $LOCAL_PATCH_PATH $HDST"
             sudo -u $HDFS_USER hadoop fs -put -f "$LOCAL_PATCH_PATH" "$HDST"
-            checkstatus "ERROR: failed to (hadoop fs -put -f $LOCAL_PATCH_PATH $HDST)"
+            checkstatus "hadoop fs -put -f $LOCAL_PATCH_PATH $HDST)"
         else
 
             # Rollback changes - need to handle 2 cases; hadoop-azure*.jar.original -> hadoop-azure*.jar & hadoop-azure*.jar -> rm
@@ -277,16 +277,16 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
                 HDST_ORIG=$(dirname "$HDST")/$(basename "$HDST" $BACKUP_SUFFIX)
                 echo "    hadoop fs -cp $HDST $HDST_ORIG"
                 sudo -u $HDFS_USER hadoop fs -cp "$HDST" "$HDST_ORIG" 
-                checkstatus "ERROR: failed to (hadoop fs -cp $HDST $HDST_ORIG)"
+                checkstatus "hadoop fs -cp $HDST $HDST_ORIG)"
                 sudo -u $HDFS_USER hadoop fs -rm "$HDST_ORIG"
-                checkstatus "ERROR: failed to (hadoop fs -rm $HDST_ORIG)"
+                checkstatus "hadoop fs -rm $HDST_ORIG)"
 
             elif [[ "$HDST_EXTENSION" == "$JAR_EXTENSION" ]]; then
 
                 # hadoop-azure*.jar -> rm
                 echo "    hadoop fs -rm $HDST"
                 sudo -u $HDFS_USER hadoop fs -rm "$HDST"
-                checkstatus "ERROR: failed to (hadoop fs -rm $HDST_ORIG)"
+                checkstatus "hadoop fs -rm $HDST_ORIG)
             fi
         fi
     done
