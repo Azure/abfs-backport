@@ -265,7 +265,7 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
             HDST="$(dirname "$HDST")/$PATCHED_JAR_FILE_NAME.jar"
             echo "    hadoop fs -put -f $LOCAL_PATCH_PATH $HDST"
             sudo -u $HDFS_USER hadoop fs -put -f "$LOCAL_PATCH_PATH" "$HDST"
-            checkstatus "hadoop fs -put -f $LOCAL_PATCH_PATH $HDST)"
+            checkstatus "hadoop fs -put -f $LOCAL_PATCH_PATH $HDST"
         else
 
             # Rollback changes - need to handle 2 cases; hadoop-azure*.jar.original -> hadoop-azure*.jar & hadoop-azure*.jar -> rm
@@ -277,16 +277,16 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
                 HDST_ORIG=$(dirname "$HDST")/$(basename "$HDST" $BACKUP_SUFFIX)
                 echo "    hadoop fs -cp $HDST $HDST_ORIG"
                 sudo -u $HDFS_USER hadoop fs -cp "$HDST" "$HDST_ORIG" 
-                checkstatus "hadoop fs -cp $HDST $HDST_ORIG)"
+                checkstatus "hadoop fs -cp $HDST $HDST_ORIG"
                 sudo -u $HDFS_USER hadoop fs -rm "$HDST_ORIG"
-                checkstatus "hadoop fs -rm $HDST_ORIG)"
+                checkstatus "hadoop fs -rm $HDST_ORIG"
 
             elif [[ "$HDST_EXTENSION" == "$JAR_EXTENSION" ]]; then
 
                 # hadoop-azure*.jar -> rm
                 echo "    hadoop fs -rm $HDST"
                 sudo -u $HDFS_USER hadoop fs -rm "$HDST"
-                checkstatus "hadoop fs -rm $HDST_ORIG)
+                checkstatus "hadoop fs -rm $HDST"
             fi
         fi
     done
@@ -396,4 +396,3 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
     done
 fi
 echo "Finished"
-
