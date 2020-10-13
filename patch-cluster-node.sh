@@ -57,11 +57,12 @@ do
             ;;
         R)
             ROLLBACK=1
-            if [ -z ${OPTARG} ]; then
+            ROLLBACK_VERSION=${OPTARG}
+            if [ -z ${ROLLBACK_VERSION} ]; then
                 echo "Exiting; Backup version parameter is required for rollback"
                 exit 4
             fi
-            BACKUP_SUFFIX=".original_${OPTARG}"
+            BACKUP_SUFFIX=".original_${ROLLBACK_VERSION}"
             ;;
         *|?|h)
             echo "Usage: $0 [-a] [-u HDFS_USER] [-t TARGET_VERSION] [-p DIRECTORY_PREFIX] [-P HDFS_DIRECTORY_PREFIX] [-R] [-?]"
@@ -73,7 +74,8 @@ do
             echo "                  Specifies a prefix that is specific to the Hadoop distro & version to search for files to patch."
             echo "  -P HDFS_DIRECTORY_PREFIX "
             echo "                  Specifies a prefix that is specific to the Hadoop distro & version to search on HDFS for files to patch."
-            echo "  -R              Rollback installation. Restores previously backed up versions of hadoop-azure jar file. Rollback for HDFS "
+            echo "  -R ROLLBACK_VERSION "
+            echo "                  Rollback installation. Restores previously backed up versions of hadoop-azure jar file. Rollback for HDFS "
             echo "                  should follow same model as deployment. Specify the backup version for the rollback. Ex: Specify 2020-06-07-10-10-10 "
             echo "                  for the backup file named hadoop-azure.*.jar.original_2020-06-07-10-10-10"
             exit 1
