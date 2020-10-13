@@ -5,30 +5,14 @@
 # To fully patch a cluster, this script must be run on EVERY node to update the local filesystem. On ONE NODE ONLY
 # the -a switch must be specified to patch the HDFS contents.
 
-checkstatus() {
-    
-     if [ $? -ne 0 ]; then
-        echo "DEBUG... $1 failed"
-    else
-        echo "DEBUG... $1 success"
-    fi
-}
-
-which jq > /dev/null
-checkstatus "jq check"
-if [ $? -ne 0 ]; then
-
-    echo "This script requires jq to run. Please install using preferred package manager"
-    exit 1
-fi
-
-
 # Parameters
 APPLY_HDFS_PATCH=0
 HDFS_USER=hdfs
 DIR_PREFIX=
 HDFS_DIR_PREFIX=
 ROLLBACK=0
+
+TARGET_RELEASE="HDP-2.5.2"
 
 
 # Constants
@@ -40,6 +24,21 @@ JAR_EXTENSION=".jar"
 #
 JAR_FIND_SUFFIX=""
 
+checkstatus() {
+    
+     if [ $? -ne 0 ]; then
+        echo "DEBUG... $1 failed"
+    else
+        echo "DEBUG... $1 success"
+    fi
+}
+
+which jq > /dev/null
+if [ $? -ne 0 ]; then
+
+    echo "This script requires jq to run. Please install using preferred package manager"
+    exit 1
+fi
 
 while getopts ":a?hu:p:P:R:" options
 do
@@ -85,8 +84,6 @@ done
 
 [[ "${DIR_PREFIX}" != */ ]] && DIR_PREFIX="${DIR_PREFIX}/"
 [[ "${HDFS_DIR_PREFIX}" != */ ]] && HDFS_DIR_PREFIX="${HDFS_DIR_PREFIX}/"
-
-TARGET_RELEASE="HDP-2.5.2"
 
 
 # Confirm rollback
