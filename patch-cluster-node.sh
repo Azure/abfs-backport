@@ -8,20 +8,17 @@
 # Parameters
 APPLY_HDFS_PATCH=0
 HDFS_USER=hdfs
-DIR_PREFIX=
-HDFS_DIR_PREFIX=
+DIR_PREFIX=/usr/hdp/
+HDFS_DIR_PREFIX=/hdp/apps/
 ROLLBACK=0
-
 TARGET_RELEASE="HDP-2.5.2"
-
 
 # Constants
 export MATCHED_JAR_FILE_NAME=hadoop-azure
-GITHUB_API_ROOT_URI=https://api.github.com/repos/jamesbak/abfs_backport
+GITHUB_API_ROOT_URI=https://api.github.com/repos/Azure/abfs-backport
 CURR_TIME=$(date "+%Y-%m-%d-%H-%M-%S")
 BACKUP_SUFFIX=".original_${CURR_TIME}"
 JAR_EXTENSION=".jar"
-#
 JAR_FIND_SUFFIX=""
 
 checkstatus() {
@@ -48,6 +45,9 @@ do
             ;;
         u)
             HDFS_USER=${OPTARG}
+            ;;
+        t)
+            TARGET_RELEASE=${OPTARG}
             ;;
         p)
             DIR_PREFIX=${OPTARG}
@@ -121,7 +121,7 @@ fi
 
 
 RELEASE_INFO=$(curl "${GITHUB_API_ROOT_URI}/releases/tags/${TARGET_RELEASE}")
-JAR_ASSET=$(echo $RELEASE_INFO | jq -r '.assets[] | select(.content_type == "application/java-archive") | .')
+JAR_ASSET=$(echo $RELEASE_INFO | jq -r '.assets[] | select(.content_type == "application/java-archive" or .content_type == "application/octet-stream") | .')
 if [[ -z "$JAR_ASSET" ]]; then
 
     echo "Unable to get information for .jar file associated with $TARGET_RELEASE release."
