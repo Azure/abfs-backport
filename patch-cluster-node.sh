@@ -197,15 +197,15 @@ do
     echo $DST
     if [ $ROLLBACK -eq 0 ]; then
 
+        # Backup original file (jar or symlink) if not already backed up
+        if [[ ! -e "${DST}${BACKUP_SUFFIX}" ]]; then
+
+            cp "$DST" "${DST}${BACKUP_SUFFIX}"
+            checkstatus "cp $DST ${DST}${BACKUP_SUFFIX}"
+        fi
+
         # Different handling for symlink or real file
         if [[ ! -h "$DST" ]]; then
-
-            # Backup original file (jar or symlink) if not already backed up
-            if [[ ! -e "${DST}${BACKUP_SUFFIX}" ]]; then
-
-                cp "$DST" "${DST}${BACKUP_SUFFIX}"
-                checkstatus "cp $DST ${DST}${BACKUP_SUFFIX}"
-            fi
 
             # Replace with patched JAR
             rm -f "$DST"
@@ -214,6 +214,12 @@ do
             echo "    cp $LOCAL_PATCH_PATH $DST"
             cp "$LOCAL_PATCH_PATH" "$DST"
             checkstatus "cp $LOCAL_PATCH_PATH $DST"
+        else
+
+            # For symlink, assume the target will be replaced with the correctly named file. Just update the link.
+            NEW_TARGET="$(dirname $(readlink "$DST"))/$PATCHED_JAR_FILE_NAME.jar"
+            ln -sfn "$NEW_TARGET" "$DST"
+            checkstatus "ln -sfn NEW_TARGET DST"
         fi
         
     else
