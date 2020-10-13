@@ -1,7 +1,0 @@
-{
-    "properties": {
-        "HDFS_USER": "hdfs",
-        "DIR_PREFIX": "/usr/hdp/",
-        "HDFS_DIR_PREFIX": "/hdp/apps/"
-    }
-}
