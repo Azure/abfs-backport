@@ -200,7 +200,7 @@ do
         # Backup original file (jar or symlink) if not already backed up
         if [[ ! -e "${DST}${BACKUP_SUFFIX}" ]]; then
 
-            cp "$DST" "${DST}${BACKUP_SUFFIX}"
+            cp -P "$DST" "${DST}${BACKUP_SUFFIX}"
             checkstatus "cp $DST ${DST}${BACKUP_SUFFIX}"
         fi
 
@@ -232,7 +232,7 @@ do
             # hadoop-azure*.jar.original -> hadoop-azure*.jar
             DST_ORIG=$(dirname "$DST")/$(basename "$DST" $BACKUP_SUFFIX)
             echo "    cp ${DST} $DST_ORIG"
-            cp "${DST}" "$DST_ORIG"
+            cp -P "${DST}" "$DST_ORIG"
             checkstatus "cp ${DST} $DST_ORIG"
             rm "${DST}"
             checkstatus "rm ${DST}"
