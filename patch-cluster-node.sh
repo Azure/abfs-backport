@@ -283,8 +283,8 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
                 echo "    hadoop fs -cp $HDST $HDST_ORIG"
                 sudo -u $HDFS_USER hadoop fs -cp "$HDST" "$HDST_ORIG" 
                 checkstatus "hadoop fs -cp $HDST $HDST_ORIG"
-                sudo -u $HDFS_USER hadoop fs -rm "$HDST_ORIG"
-                checkstatus "hadoop fs -rm $HDST_ORIG"
+                sudo -u $HDFS_USER hadoop fs -rm "$HDST"
+                checkstatus "hadoop fs -rm $HDST"
 
             elif [[ "$HDST_EXTENSION" == "$JAR_EXTENSION" ]]; then
 
