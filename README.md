@@ -8,8 +8,10 @@ For customers that want to connect to ADLS from existing older clusters, we have
 To patch the cluster, all nodes in the cluster must be patched. The script patch-cluster-node.sh provided with the repo https://github.com/Azure/abfs-backport helps patch a node with a hadoop-azure jar with ABFS driver. The same has been tested on the following versions of HDP clusters (HDP-2.5.3, HDP-2.6.0, HDP-2.6.1, HDP-2.6.2 & HDP-2.6.5).
 
 ### Note:
-Thge script needs to be run as sudo.
+The script needs to be run as sudo.
+
 The script needs to be run with -a option on one of the nodes. This is to patch the jar in the HDFS filesystem. All other invocations patch the local filesystem of each node in the cluster.
+
 It is reccommanded to redirect the script logs into a file for debugging purpose.
 
 
