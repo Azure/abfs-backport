@@ -318,7 +318,9 @@ if [ $APPLY_HDFS_PATCH -gt 0 ]; then
 
     echo ""
     echo "Updating all .tar.gz files on HDFS matching $HDFS_DIR_PREFIX*.tar.gz"
-    for HGZ in $(sudo -E -u $HDFS_USER hadoop fs -find "$HDFS_DIR_PREFIX" -name "*.tar.gz" -print0 | xargs -0 -I % sudo -E sh -c 'hadoop fs -cat % | tar -tzv | grep "$MATCHED_JAR_FILE_NAME" && echo %' | grep ".tar.gz")
+    # Get list of *.tar.gz files from HDFS & filter for those containing our patch jar in 2 steps, so that we can correctly preserve the user context
+    HGZ_FILES_ALL=$(sudo -u $HDFS_USER hadoop fs -find "$HDFS_DIR_PREFIX" -name "*.tar.gz")
+    for HGZ in $(for f in $HGZ_FILES_ALL; do sudo -u $HDFS_USER hadoop fs -cat $f | tar -tzv | grep "$MATCHED_JAR_FILE_NAME" && echo $f; done | grep ".tar.gz")
     do
 
         echo "$HGZ"
