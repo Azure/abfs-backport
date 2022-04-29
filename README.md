@@ -46,6 +46,35 @@ Where:
 
 `-R ROLLBACK_VERSION`  Rollback installation. Restores previously backed up versions of hadoop-azure jar file. Rollback for HDFS should follow same model as deployment. Specify the backup version for the rollback. Ex: Specify 2020-06-07-10-10-10 for the backup file named hadoop-azure.*.jar.original_2020-06-07-10-10-10
 
+## Registering the ABFS driver
+The following changes must be included in core-site.xml, so that Hadoop can correctly instantiate the ABFS driver using the abfs[s]:// protocol:
+
+```xml
+<property>
+  <name>fs.abfs.impl</name>
+  <value>org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem</value>
+  <description>The implementation class of the Azure Blob Filesystem</description>
+</property>
+ 
+<property>
+  <name>fs.abfss.impl</name>
+  <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
+  <description>The implementation class of the Secure Azure Blob Filesystem</description>
+</property>
+ 
+<property>
+  <name>fs.AbstractFileSystem.abfs.impl</name>
+  <value>org.apache.hadoop.fs.azurebfs.Abfs</value>
+  <description>AbstractFileSystem implementation class of abfs://</description>
+</property>
+ 
+<property>
+  <name>fs.AbstractFileSystem.abfss.impl</name>
+  <value>org.apache.hadoop.fs.azurebfs.Abfss</value>
+  <description>AbstractFileSystem implementation class of abfss://</description>
+</property>
+```
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
